@@ -13,7 +13,45 @@ void setup() {
   startAP();
 }
 
+// void loop() {
+//   WiFiClient client = server.available();
+//   if(client){
+//     Serial.println("New Client");
+//     String currentLine = "";
+//     while(client.connected()){
+//       if(client.available()){
+//         char c = client.read();
+
+//         #if DEBUG_PRINTS == 1
+//           Serial.write(c);
+//         #endif
+
+//         if(c == END_TOKEN){
+
+//           #if DEBUG_PRINTS == 1
+//             Serial.println("Current line: " + currentLine);
+//           #endif
+          
+//           if (!handleCommands(client, currentLine)){
+//             break;                                         //Disconnect if return false
+//           }
+//           currentLine = "";
+//           while (client.available()){ c = client.read(); } //Flush remaining chars
+//         }else{
+//           currentLine += c;
+//         }
+//       }
+//     }
+//     client.stop();
+//     Serial.println("Client disconnected");
+//   }
+// }
+
 void loop() {
+  wifiHandler();
+}
+
+void wifiHandler(){
   WiFiClient client = server.available();
   if(client){
     Serial.println("New Client");
@@ -41,9 +79,26 @@ void loop() {
           currentLine += c;
         }
       }
+      serialHandler();
     }
     client.stop();
     Serial.println("Client disconnected");
+  }else{
+    serialHandler();
+  }
+}
+
+//For debugging
+void serialHandler(){
+  if(Serial.available()){
+    String rxMessage = "";
+    while(Serial.available()){
+      rxMessage += (char)Serial.read();
+    }
+
+    #if DEBUG_PRINTS == 1
+    Serial.println("serial echo: " + rxMessage);
+    #endif
   }
 }
 
