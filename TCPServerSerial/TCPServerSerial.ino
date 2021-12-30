@@ -1,15 +1,16 @@
 #include <WiFi.h>
-#include <arduino-timer.h>
 
-const char *ssid = "EngineControl";
+#define DEBUG_PRINTS 1
 
+//For AP
+const char *apSSID = "EngineControl";
 WiFiServer server(23);
-auto sendTimer = timer_create_default();
+
+const char END_TOKEN = '\r';
 
 void setup() {
   Serial.begin(115200);
   startAP();
-  // sendTimer.every(1000, sendData);  
 }
 
 void loop() {
@@ -17,42 +18,52 @@ void loop() {
   if(client){
     Serial.println("New Client");
     String currentLine = "";
-    Serial.println(currentLine);
     while(client.connected()){
       if(client.available()){
         char c = client.read();
-        Serial.write(c);
-        if(c == '\n' || c == '\r'){
+
+        #if DEBUG_PRINTS == 1
+          Serial.write(c);
+        #endif
+
+        if(c == END_TOKEN){
+
+          #if DEBUG_PRINTS == 1
+            Serial.println("Current line: " + currentLine);
+          #endif
+          
+          if (!handleCommands(client, currentLine)){
+            break;                                         //Disconnect if return false
+          }
           currentLine = "";
+          while (client.available()){ c = client.read(); } //Flush remaining chars
         }else{
           currentLine += c;
-        }
-        if(currentLine == "exit"){
-          break;
-        }else if(currentLine == "42"){
-          client.print("The meaning of life, the universe and everything");
         }
       }
     }
     client.stop();
     Serial.println("Client disconnected");
   }
-
-  // sendTimer.tick();
 }
 
+//Start a access point
 void startAP(){
+  WiFi.mode(WIFI_AP);
   Serial.println();
   Serial.println("Configuring access point...");
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(ssid);
+  WiFi.softAP(apSSID);
   Serial.print("AP IP:");
   Serial.println(WiFi.softAPIP());
   server.begin();
   Serial.println("Server started");
 }
 
-bool sendData(void *){
-  Serial.println("Working");
+bool handleCommands(WiFiClient client, String line){
+  if(line == "exit"){
+    return false;
+  }else if(line == "42"){
+    client.println("The meaning of life, the universe and everything");
+  }
   return true;
 }
