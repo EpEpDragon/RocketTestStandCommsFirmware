@@ -1,6 +1,7 @@
 #include <WiFi.h>
 
-#define DEBUG_PRINTS 1
+#define DEBUG_PRINTS 0
+#define SERIAL_ECHO 1
 
 //For AP
 const char *apSSID = "EngineControl";
@@ -62,8 +63,8 @@ void serialHandler(){
       rxMessage += (char)Serial.read();
     }
 
-    #if DEBUG_PRINTS == 1
-    Serial.println("serial echo: " + rxMessage);
+    #if SERIAL_ECHO == 1
+    Serial.println("echo: " + rxMessage);
     #endif
   }
 }
