@@ -1,4 +1,5 @@
 #include <CircularBuffer.h>
+#include <Wire.h>
 #include <WiFi.h>
 
 #define DEBUG_PRINTS 0
@@ -8,9 +9,12 @@
 const char *apSSID = "EngineControl";
 WiFiServer server(23);
 
+//For I2C
+const int slaveADDR = 4;
+
 const char END_TOKEN = '\r';
 
-CircularBuffer<char, 1000> txCommsBuffer;
+CircularBuffer<char, 1000> txCommsBuffer; //Buffer for incoming commands from PC
 
 void setup() {
   Serial.begin(115200);
@@ -18,36 +22,17 @@ void setup() {
 }
 
 void loop() {
-  wifiHandler();
+  commsHandler();
 }
 
-void wifiHandler(){
+void commsHandler(){
   WiFiClient client = server.available();
   if(client){
     Serial.println("New Client");
-    String currentLine = "";
+    // String currentLine = "";
     while(client.connected()){
       if(client.available()){
-        char c = client.read();
-
-        #if DEBUG_PRINTS == 1
-          Serial.write(c);
-        #endif
-
-        currentLine += c;
-        
-        if(c == END_TOKEN){
-
-          #if DEBUG_PRINTS == 1
-            Serial.println("Current line: " + currentLine);
-          #endif
-          
-          if (!handleCommands(client, currentLine)){
-            break;                                         //Disconnect if return false
-          }
-          currentLine = "";
-          // while (client.available()){ c = client.read(); } //Flush remaining chars
-        }
+        if(!readWifi(client)){ break; } //Disconnect if false
       }
       serialHandler();
     }
@@ -56,6 +41,35 @@ void wifiHandler(){
   }else{
     serialHandler();
   }
+}
+
+//Read wifi for commands
+bool readWifi(WiFiClient client){
+  static String currentLine = "";
+  char c = client.read();
+
+  #if DEBUG_PRINTS == 1
+    Serial.write(c);
+  #endif
+
+  currentLine += c;
+  if(c == END_TOKEN){
+
+    #if DEBUG_PRINTS == 1
+      Serial.println("Current line: " + currentLine);
+    #endif
+    
+    if (!handleCommands(client, currentLine)){
+      return false;                                         //Disconnect if return false
+    }
+    currentLine = "";
+  }
+  return true;
+}
+
+//TODO Send data back over wifi
+void sendWifi(WiFiClient client){
+  
 }
 
 //For debugging
@@ -75,12 +89,12 @@ void serialHandler(){
       }
       txCommsBuffer.shift();
     }else if(rxMessage == "size"){
-      Serial.print(txCommsBuffer.size());
+      Serial.println("\nCommands in buffer:" + (String)txCommsBuffer.size());
       
     }
 
     #if SERIAL_ECHO == 1
-    Serial.println("echo: " + rxMessage);
+    Serial.println("\necho: " + rxMessage);
     #endif
   }
 }
