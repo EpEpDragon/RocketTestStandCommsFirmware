@@ -18,11 +18,18 @@ CircularBuffer<char, 1000> txCommsBuffer; //Buffer for incoming commands from PC
 
 void setup() {
   Serial.begin(115200);
+  Wire.begin(slaveADDR);
+  Wire.onReceive(receiveEventI2C);
   startAP();
 }
 
 void loop() {
   commsHandler();
+}
+
+//TODO implement I2C receive event
+void receiveEventI2C(int howMany){
+
 }
 
 void commsHandler(){
@@ -72,6 +79,10 @@ void sendWifi(WiFiClient client){
   
 }
 
+//TODO Implement I2C send
+void sendI2C(){
+
+}
 //For debugging
 void serialHandler(){
   if(Serial.available()){
