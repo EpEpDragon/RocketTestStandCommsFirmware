@@ -2,7 +2,7 @@
 #include <Wire.h>
 #include <WiFi.h>
 
-#define DEBUG_PRINTS 0
+#define DEBUG_PRINTS 1
 #define SERIAL_ECHO 0
 //For I2C
 #define slaveADDR 0x04
@@ -12,12 +12,13 @@ const char *apSSID = "EngineControl";
 WiFiServer server(23);
 WiFiClient client;
 
-const char END_TOKEN = '\n';
+const char END_TOKEN = (char)0xC0;
 
-CircularBuffer<char, 1000> txCommsBuffer; //Buffer for incoming commands from PC
+CircularBuffer<char, 1024> txCommsBuffer; //Buffer for incoming commands from PC
 
 void setup() {
   Serial.begin(115200);
+  Wire.setClock(400000);
   Wire.onReceive(receiveEventI2C);
   Wire.onRequest(requestEventI2C);
   Wire.begin((uint8_t)slaveADDR);
@@ -29,25 +30,24 @@ void loop() {
 }
 
 void receiveEventI2C(int numBytes){
-  String line = "";
+  // String line = "";
   while (Wire.available()) {
-    line += (char)Wire.read();
-  }
-  
-  #if DEBUG_PRINTS == 1
-  Serial.print(line);
-  #endif
-  
-  if(client){
-    client.print(line);
-  }else{
-    #if DEBUG_PRINTS == 1
-    Serial.println("No client connected");
-    #endif
+    // line += (char)Wire.read();
+    if(client){
+      char c = (char)Wire.read();
+      client.write(c);
+        #if DEBUG_PRINTS == 1
+        Serial.print("I2C receive: ");
+        Serial.write(c);
+        #endif
+    }else{
+      #if DEBUG_PRINTS == 1
+      Serial.println("No client connected");
+      #endif
+    }
   }
 }
 
-//TODO implement I2C request event
 void requestEventI2C(){
   #if DEBUG_PRINTS == 1
   Serial.print("request");
@@ -76,35 +76,35 @@ void commsHandler(){
       if(client.available()){
         if(!readWifi(client)){ break; } //Disconnect if false
       }
-      serialHandler();
+      // serialHandler();
     }
     client.stop();
     Serial.println("Client disconnected");
   }else{
-    serialHandler();
+    // serialHandler();
   }
 }
 
 //Read wifi for commands
 bool readWifi(WiFiClient client){
-  static String currentLine = "";
-  char c = client.read();
+  // static char currentLine[1024];
+  txCommsBuffer.push(client.read());
 
   #if DEBUG_PRINTS == 1
-    Serial.write(c);
+    Serial.write(txCommsBuffer.last());
   #endif
 
-  currentLine += c;
-  if(c == END_TOKEN){
-    #if DEBUG_PRINTS == 1
-      Serial.println("Current line: " + currentLine);
-    #endif
+  // currentLine += c;
+  // if(c == END_TOKEN){
+  //   #if DEBUG_PRINTS == 1
+  //     Serial.println("Current line: " + currentLine);
+  //   #endif
     
-    if (!handleCommands(client, currentLine)){
-      return false;                                         //Disconnect if return false
-    }
-    currentLine = "";
-  }
+  //   if (!handleCommands(client, currentLine)){
+  //     return false;                                         //Disconnect if return false
+  //   }
+  //   currentLine = "";
+  // }
   return true;
 }
 
@@ -128,7 +128,6 @@ void serialHandler(){
       }
     }else if(rxMessage == "size"){
       Serial.println("\nCommands in buffer:" + (String)txCommsBuffer.size());
-      
     }
 
     #if SERIAL_ECHO == 1
@@ -150,8 +149,16 @@ void startAP(){
 }
 
 bool handleCommands(WiFiClient client, String line){
-  if(line == "exit\r\n"){   // TODO change this to be correct end token
+  if(line == "exit\r\n"){
     return false;
+  }else if(line == "shiftComm\r\n"){
+    while(!txCommsBuffer.isEmpty()){
+        if(txCommsBuffer.first() == END_TOKEN){
+          Serial.print(txCommsBuffer.shift());
+          break;
+        }
+        Serial.print(txCommsBuffer.shift());
+      }
   }else{
     for (int i = 0; i < line.length(); i++)
     {
